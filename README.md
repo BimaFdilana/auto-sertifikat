@@ -26,8 +26,9 @@ Alur: **Google Form → Google Sheets → Apps Script → PDF sertifikat (Drive)
 1. Di Apps Script: **Deploy → New deployment → ikon roda gigi → Web app**.
    - Execute as: **Me**
    - Who has access: **Anyone**
-2. Klik **Deploy**, izinkan akses, lalu jalankan fungsi `updateFormConfirmation()` sekali.
-3. Pesan konfirmasi Form sekarang berisi link **UNDUH SERTIFIKAT**. Peserta memasukkan email yang sama dengan di form, lalu link PDF muncul (halaman menunggu otomatis sampai sertifikat selesai dibuat).
+2. Klik **Deploy**, izinkan akses, lalu **salin Web app URL yang berakhiran `/exec`** (bukan `/dev`, itu hanya bisa dibuka pemilik).
+3. Tempel di `CONFIG.WEBAPP_URL`, lalu jalankan fungsi `updateFormConfirmation()` sekali.
+4. Pesan konfirmasi Form sekarang berisi link **UNDUH SERTIFIKAT**. Peserta memasukkan email yang sama dengan di form, lalu link PDF muncul (halaman menunggu otomatis sampai sertifikat selesai dibuat).
 
 > Kalau kode di-update lagi nanti, buka **Deploy → Manage deployments → Edit → New version → Deploy** supaya halaman unduh ikut berubah. Jangan jalankan `setup()` ulang.
 

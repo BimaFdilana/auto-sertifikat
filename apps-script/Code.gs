@@ -24,6 +24,10 @@ var CONFIG = {
   // Nama folder Drive tempat PDF sertifikat disimpan (dibuat otomatis kalau belum ada)
   OUTPUT_FOLDER_NAME: 'Sertifikat DWP Bengkalis 2026',
 
+  // Link publik Web App (berakhiran /exec). Isi SETELAH Deploy > New deployment > Web app.
+  // JANGAN pakai link berakhiran /dev: itu hanya bisa dibuka pemilik script.
+  WEBAPP_URL: '',
+
   // Pesan di halaman konfirmasi Form (link halaman unduh ditambahkan otomatis oleh updateFormConfirmation)
   CONFIRMATION_TEXT: 'Terima kasih, kehadiran Anda sudah tercatat. Klik tautan di bawah untuk mengunduh sertifikat (masukkan email yang sama dengan yang Anda pakai di form).',
 
@@ -226,15 +230,17 @@ function findCertificate(email) {
 }
 
 /**
- * Jalankan SETELAH deploy Web App: memasang tautan halaman unduh
- * ke pesan konfirmasi Form. Boleh dijalankan ulang kapan saja.
+ * Jalankan SETELAH deploy Web App dan mengisi CONFIG.WEBAPP_URL (link /exec):
+ * memasang tautan halaman unduh ke pesan konfirmasi Form. Boleh dijalankan ulang.
  */
 function updateFormConfirmation() {
-  var url = ScriptApp.getService().getUrl();
-  if (!url) throw new Error('Web App belum di-deploy. Deploy > New deployment > Web app dulu.');
+  var url = String(CONFIG.WEBAPP_URL || '').trim();
+  if (!url) throw new Error('Isi CONFIG.WEBAPP_URL dengan link Web App yang berakhiran /exec.');
+  if (/\/dev$/.test(url)) throw new Error('Link berakhiran /dev hanya untuk pemilik. Pakai link /exec dari New deployment.');
+  if (!/\/exec$/.test(url)) throw new Error('Link Web App harus berakhiran /exec.');
   var formId = PropertiesService.getScriptProperties().getProperty('FORM_ID');
   FormApp.openById(formId).setConfirmationMessage(CONFIG.CONFIRMATION_TEXT + '\n\nUNDUH SERTIFIKAT: ' + url);
-  Logger.log('Halaman unduh: ' + url);
+  Logger.log('Halaman unduh dipasang di Form: ' + url);
 }
 
 var DOWNLOAD_PAGE_ = `<!doctype html><html><head><base target="_top"><style>

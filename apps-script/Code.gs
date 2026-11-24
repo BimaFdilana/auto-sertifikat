@@ -31,6 +31,10 @@ var CONFIG = {
   // Pesan di halaman konfirmasi Form (link halaman unduh ditambahkan otomatis oleh updateFormConfirmation)
   CONFIRMATION_TEXT: 'Terima kasih, kehadiran Anda sudah tercatat. Klik tautan di bawah untuk mengunduh sertifikat (masukkan email yang sama dengan yang Anda pakai di form).',
 
+  // Lama form dibuka (jam) sejak openFormForHours() dijalankan, lalu otomatis ditutup
+  FORM_OPEN_HOURS: 24,
+  FORM_CLOSED_MESSAGE: 'Pengisian daftar hadir sudah ditutup. Terima kasih atas partisipasi Anda.',
+
   // Kirim sertifikat ke email peserta secara otomatis?
   SEND_EMAIL: true,
   EMAIL_SUBJECT: 'Sertifikat Webinar Dharma Wanita Persatuan Kabupaten Bengkalis 2026',
@@ -241,6 +245,42 @@ function updateFormConfirmation() {
   var formId = PropertiesService.getScriptProperties().getProperty('FORM_ID');
   FormApp.openById(formId).setConfirmationMessage(CONFIG.CONFIRMATION_TEXT + '\n\nUNDUH SERTIFIKAT: ' + url);
   Logger.log('Halaman unduh dipasang di Form: ' + url);
+}
+
+// ============================== MASA BERLAKU FORM ==============================
+/**
+ * Jalankan fungsi ini TEPAT saat form mau dibuka ke peserta.
+ * Form dibuka sekarang dan otomatis ditutup setelah CONFIG.FORM_OPEN_HOURS jam
+ * (default 24 jam). Boleh dijalankan ulang untuk memulai hitungan dari awal.
+ * Penutupan dijalankan Google, bisa meleset beberapa menit.
+ */
+function openFormForHours() {
+  var props = PropertiesService.getScriptProperties();
+  var form = FormApp.openById(props.getProperty('FORM_ID'));
+
+  removeCloseTriggers_();
+  form.setCustomClosedFormMessage(CONFIG.FORM_CLOSED_MESSAGE);
+  form.setAcceptingResponses(true);
+
+  var closeAt = new Date(Date.now() + CONFIG.FORM_OPEN_HOURS * 3600 * 1000);
+  ScriptApp.newTrigger('closeForm').timeBased().at(closeAt).create();
+
+  Logger.log('Form DIBUKA. Otomatis ditutup: ' + closeAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
+  Logger.log('Link form: ' + form.getPublishedUrl());
+}
+
+/** Dipanggil otomatis oleh timer. Boleh juga dijalankan manual untuk menutup form sekarang. */
+function closeForm() {
+  var form = FormApp.openById(PropertiesService.getScriptProperties().getProperty('FORM_ID'));
+  form.setAcceptingResponses(false);
+  removeCloseTriggers_();
+  Logger.log('Form DITUTUP.');
+}
+
+function removeCloseTriggers_() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'closeForm') ScriptApp.deleteTrigger(t);
+  });
 }
 
 var DOWNLOAD_PAGE_ = `<!doctype html><html><head><base target="_top"><style>

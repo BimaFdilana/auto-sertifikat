@@ -36,6 +36,9 @@ Selesai. Setiap peserta submit form, sertifikat langsung dibuat, PDF disimpan di
 `Sertifikat DWP Bengkalis 2026`, dan dikirim ke email peserta. Kolom **Status Sertifikat** dan
 **Link Sertifikat (PDF)** terisi otomatis di Sheet.
 
+## Masa berlaku form (24 jam)
+Jalankan `openFormForHours()` **tepat saat form mau dibagikan**. Form dibuka, lalu otomatis ditutup setelah `FORM_OPEN_HOURS` jam (default 24). Untuk menutup lebih cepat, jalankan `closeForm()`. Halaman unduh sertifikat tetap aktif setelah form ditutup.
+
 ## Catatan penting
 - **Link PDF bersifat "siapa saja yang punya link"** (tanpa login), dan halaman unduh mencari berdasarkan email. Artinya orang yang tahu email peserta lain bisa melihat nama dan sertifikatnya. Risikonya kecil untuk acara ini, tapi baik diketahui.
 - **Typo nama = sertifikat salah.** Form sudah memberi peringatan; kalau ada koreksi, hapus status di baris itu lalu jalankan `generateMissingCertificates()`.

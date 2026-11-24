@@ -24,6 +24,9 @@ var CONFIG = {
   // Nama folder Drive tempat PDF sertifikat disimpan (dibuat otomatis kalau belum ada)
   OUTPUT_FOLDER_NAME: 'Sertifikat DWP Bengkalis 2026',
 
+  // Pesan di halaman konfirmasi Form (link halaman unduh ditambahkan otomatis oleh updateFormConfirmation)
+  CONFIRMATION_TEXT: 'Terima kasih, kehadiran Anda sudah tercatat. Klik tautan di bawah untuk mengunduh sertifikat (masukkan email yang sama dengan yang Anda pakai di form).',
+
   // Kirim sertifikat ke email peserta secara otomatis?
   SEND_EMAIL: true,
   EMAIL_SUBJECT: 'Sertifikat Webinar Dharma Wanita Persatuan Kabupaten Bengkalis 2026',
@@ -74,6 +77,9 @@ function setup() {
     SHEET_ID: ss.getId()
   });
 
+  form.setConfirmationMessage(CONFIG.CONFIRMATION_TEXT);
+
+  Logger.log('LANGKAH BERIKUTNYA: Deploy > New deployment > Web app, lalu jalankan updateFormConfirmation().');
   Logger.log('FORM (bagikan ke peserta): ' + form.getPublishedUrl());
   Logger.log('FORM (edit): ' + form.getEditUrl());
   Logger.log('SPREADSHEET: ' + ss.getUrl());
@@ -127,7 +133,7 @@ function processRow_(sheet, row) {
     if (!name) throw new Error('Nama kosong');
 
     var pdfFile = buildCertificate_(name);
-    linkCell.setValue(pdfFile.getUrl());
+    linkCell.setValue('https://drive.google.com/uc?export=download&id=' + pdfFile.getId());
 
     var email = headers[COL.EMAIL] ? String(sheet.getRange(row, headers[COL.EMAIL]).getValue()).trim() : '';
     if (CONFIG.SEND_EMAIL && email) {
@@ -179,11 +185,106 @@ function buildCertificate_(name) {
 
     var pdfBlob = DriveApp.getFileById(copy.getId()).getAs(MimeType.PDF)
       .setName('Sertifikat - ' + name + '.pdf');
-    return folder.createFile(pdfBlob);
+    var pdf = folder.createFile(pdfBlob);
+    // Agar peserta bisa mengunduh lewat link tanpa login
+    pdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return pdf;
   } finally {
     copy.setTrashed(true); // buang salinan Slides sementara
   }
 }
+
+// ============================== HALAMAN UNDUH (Web App) ==============================
+function doGet() {
+  return HtmlService.createHtmlOutput(DOWNLOAD_PAGE_)
+    .setTitle('Unduh Sertifikat DWP Bengkalis 2026')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/** Dipanggil dari halaman unduh. Hanya mengembalikan data milik email yang diketik. */
+function findCertificate(email) {
+  email = String(email || '').trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) return { state: 'invalid' };
+
+  var ssId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  var sheet = SpreadsheetApp.openById(ssId).getSheets()[0];
+  var last = sheet.getLastRow();
+  var h = readHeaders_(sheet);
+  if (last < 2 || !h[COL.EMAIL]) return { state: 'notfound' };
+
+  var data = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
+  for (var i = data.length - 1; i >= 0; i--) { // baris terbaru dulu
+    var row = data[i];
+    if (String(row[h[COL.EMAIL] - 1]).trim().toLowerCase() !== email) continue;
+    var link = h[COL.LINK] ? String(row[h[COL.LINK] - 1]) : '';
+    var status = h[COL.STATUS] ? String(row[h[COL.STATUS] - 1]) : '';
+    if (link) return { state: 'ready', url: link, name: String(row[h[COL.NAMA] - 1]) };
+    if (status.indexOf('GAGAL') === 0) return { state: 'failed' };
+    return { state: 'pending' };
+  }
+  return { state: 'notfound' };
+}
+
+/**
+ * Jalankan SETELAH deploy Web App: memasang tautan halaman unduh
+ * ke pesan konfirmasi Form. Boleh dijalankan ulang kapan saja.
+ */
+function updateFormConfirmation() {
+  var url = ScriptApp.getService().getUrl();
+  if (!url) throw new Error('Web App belum di-deploy. Deploy > New deployment > Web app dulu.');
+  var formId = PropertiesService.getScriptProperties().getProperty('FORM_ID');
+  FormApp.openById(formId).setConfirmationMessage(CONFIG.CONFIRMATION_TEXT + '\n\nUNDUH SERTIFIKAT: ' + url);
+  Logger.log('Halaman unduh: ' + url);
+}
+
+var DOWNLOAD_PAGE_ = `<!doctype html><html><head><base target="_top"><style>
+body{font-family:Arial,sans-serif;background:#fdf1ec;margin:0;padding:24px 16px;color:#1f2a44}
+.card{max-width:440px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+h1{font-size:20px;margin:0 0 6px}p{font-size:14px;line-height:1.5;margin:0 0 16px}
+label{font-size:14px;font-weight:bold}
+input{width:100%;box-sizing:border-box;padding:12px;margin:6px 0 14px;border:1px solid #bbb;border-radius:8px;font-size:16px}
+button,a.btn{display:block;text-align:center;text-decoration:none;width:100%;box-sizing:border-box;padding:13px;border:0;border-radius:8px;background:#1b6b4a;color:#fff;font-size:16px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.6}#msg{margin-top:16px;font-size:14px;line-height:1.5}.err{color:#b3261e}
+</style></head><body><div class="card">
+<h1>Unduh Sertifikat</h1>
+<p>Webinar Dharma Wanita Persatuan Kabupaten Bengkalis Tahun 2026. Masukkan email yang Anda pakai saat mengisi daftar hadir.</p>
+<label for="email">Email</label>
+<input id="email" type="email" placeholder="nama@email.com" autocomplete="email">
+<button id="go" onclick="cari()">Cari Sertifikat</button>
+<div id="msg"></div></div>
+<script>
+var tries = 0, MAX = 12;
+function el(id) { return document.getElementById(id); }
+function cari() { tries = 0; el('go').disabled = true; el('msg').textContent = 'Mencari sertifikat...'; kirim(); }
+function kirim() {
+  google.script.run
+    .withSuccessHandler(hasil)
+    .withFailureHandler(function () { selesai('Terjadi gangguan. Coba lagi sebentar lagi.', true); })
+    .findCertificate(el('email').value);
+}
+function hasil(r) {
+  if (r.state === 'ready') {
+    el('go').disabled = false;
+    var msg = el('msg');
+    msg.textContent = 'Sertifikat atas nama ' + r.name + ' sudah siap.';
+    var a = document.createElement('a');
+    a.className = 'btn'; a.href = r.url; a.textContent = 'Unduh PDF'; a.style.marginTop = '14px';
+    msg.appendChild(a);
+    return;
+  }
+  if (r.state === 'invalid') return selesai('Format email belum benar.', true);
+  if (r.state === 'failed') return selesai('Sertifikat gagal dibuat. Hubungi panitia.', true);
+  if (++tries < MAX) {
+    el('msg').textContent = 'Sertifikat sedang dibuat, mohon tunggu...';
+    setTimeout(kirim, 4000);
+  } else {
+    selesai(r.state === 'pending'
+      ? 'Sertifikat masih diproses. Coba klik tombol lagi sebentar lagi.'
+      : 'Email tidak ditemukan. Pastikan sama dengan email di form, atau hubungi panitia.', true);
+  }
+}
+function selesai(t, isErr) { el('go').disabled = false; var m = el('msg'); m.textContent = t; m.className = isErr ? 'err' : ''; }
+</script></body></html>`;
 
 // ============================== HELPER ==============================
 function getOutputFolder_() {

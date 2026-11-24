@@ -22,11 +22,21 @@ Alur: **Google Form → Google Sheets → Apps Script → PDF sertifikat (Drive)
 3. Pilih fungsi `setup` → **Run** → izinkan akses Google (Form, Sheets, Drive, Slides, Gmail).
 4. Buka **Execution log**: akan muncul link **Form** (untuk dibagikan ke peserta) dan link **Spreadsheet**.
 
+### 3. Aktifkan halaman unduh (link sertifikat setelah submit)
+1. Di Apps Script: **Deploy → New deployment → ikon roda gigi → Web app**.
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+2. Klik **Deploy**, izinkan akses, lalu jalankan fungsi `updateFormConfirmation()` sekali.
+3. Pesan konfirmasi Form sekarang berisi link **UNDUH SERTIFIKAT**. Peserta memasukkan email yang sama dengan di form, lalu link PDF muncul (halaman menunggu otomatis sampai sertifikat selesai dibuat).
+
+> Kalau kode di-update lagi nanti, buka **Deploy → Manage deployments → Edit → New version → Deploy** supaya halaman unduh ikut berubah. Jangan jalankan `setup()` ulang.
+
 Selesai. Setiap peserta submit form, sertifikat langsung dibuat, PDF disimpan di folder Drive
 `Sertifikat DWP Bengkalis 2026`, dan dikirim ke email peserta. Kolom **Status Sertifikat** dan
 **Link Sertifikat (PDF)** terisi otomatis di Sheet.
 
 ## Catatan penting
+- **Link PDF bersifat "siapa saja yang punya link"** (tanpa login), dan halaman unduh mencari berdasarkan email. Artinya orang yang tahu email peserta lain bisa melihat nama dan sertifikatnya. Risikonya kecil untuk acara ini, tapi baik diketahui.
 - **Typo nama = sertifikat salah.** Form sudah memberi peringatan; kalau ada koreksi, hapus status di baris itu lalu jalankan `generateMissingCertificates()`.
 - Baris yang gagal (status `GAGAL: ...`) bisa diulang dengan menjalankan `generateMissingCertificates()`.
 - Kuota email Gmail biasa ±100/hari (Google Workspace ±1.500). Kalau pesertanya lebih banyak, set `SEND_EMAIL: false` dan bagikan link PDF dari Sheet.

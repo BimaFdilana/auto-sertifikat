@@ -261,7 +261,7 @@ function openFormForHours() {
   var form = FormApp.openById(props.getProperty('FORM_ID'));
 
   removeCloseTriggers_();
-  form.setAcceptingResponses(true);
+  var opened = reopenForm_(form);
   setClosedMessage_(form);
 
   var closeAt = new Date(Date.now() + CONFIG.FORM_OPEN_HOURS * 3600 * 1000);
@@ -269,6 +269,10 @@ function openFormForHours() {
 
   Logger.log('Form DIBUKA. Otomatis ditutup: ' + closeAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
   Logger.log('Link form: ' + form.getPublishedUrl());
+  if (!opened) {
+    Logger.log('PERHATIAN: Google menolak membuka form dari script. Buka manual: Form > tab Respons > aktifkan "Menerima respons" ' +
+      '(atau tombol Publikasikan). Timer penutupan tetap terpasang. Jalankan diagnoseForm() lalu kirim hasilnya ke Claude.');
+  }
 }
 
 /**
@@ -282,12 +286,16 @@ function openFormUntil() {
 
   var form = FormApp.openById(PropertiesService.getScriptProperties().getProperty('FORM_ID'));
   removeCloseTriggers_();
-  form.setAcceptingResponses(true);
+  var opened = reopenForm_(form);
   setClosedMessage_(form);
   ScriptApp.newTrigger('closeForm').timeBased().at(closeAt).create();
 
   Logger.log('Form DIBUKA. Otomatis ditutup: ' + closeAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
   Logger.log('Link form: ' + form.getPublishedUrl());
+  if (!opened) {
+    Logger.log('PERHATIAN: Google menolak membuka form dari script. Buka manual: Form > tab Respons > aktifkan "Menerima respons" ' +
+      '(atau tombol Publikasikan). Timer penutupan tetap terpasang. Jalankan diagnoseForm() lalu kirim hasilnya ke Claude.');
+  }
 }
 
 /** Dipanggil otomatis oleh timer. Boleh juga dijalankan manual untuk menutup form sekarang. */
@@ -296,6 +304,50 @@ function closeForm() {
   form.setAcceptingResponses(false);
   removeCloseTriggers_();
   Logger.log('Form DITUTUP.');
+}
+
+/**
+ * Buka form dengan aman. Form model baru punya status "dipublikasikan" terpisah dari
+ * "menerima respons"; keduanya harus aktif. Mengembalikan true kalau form akhirnya terbuka.
+ */
+function reopenForm_(form) {
+  try {
+    if (typeof form.isPublished === 'function' && !form.isPublished()) form.setPublished(true);
+  } catch (err) {
+    Logger.log('Publikasi form gagal: ' + err.message);
+  }
+  try {
+    if (!form.isAcceptingResponses()) form.setAcceptingResponses(true);
+  } catch (err) {
+    Logger.log('Membuka form gagal: ' + err.message);
+    Utilities.sleep(2000);
+    try { form.setAcceptingResponses(true); } catch (err2) { Logger.log('Percobaan ulang gagal: ' + err2.message); }
+  }
+  return form.isAcceptingResponses();
+}
+
+/** Cetak kondisi form ke log untuk mencari penyebab error "Data formulir pembaruan tidak valid". */
+function diagnoseForm() {
+  var props = PropertiesService.getScriptProperties();
+  var form = FormApp.openById(props.getProperty('FORM_ID'));
+  var info = {
+    menerimaRespons: form.isAcceptingResponses(),
+    dipublikasikan: typeof form.isPublished === 'function' ? form.isPublished() : '(tidak didukung)',
+    jumlahPertanyaan: form.getItems().length,
+    kumpulkanEmail: form.collectsEmail(),
+    panjangPesanKonfirmasi: form.getConfirmationMessage().length,
+    jenisTujuan: String(form.getDestinationType()),
+    idTujuan: form.getDestinationId(),
+    jumlahRespons: form.getResponses().length
+  };
+  try {
+    var ss = SpreadsheetApp.openById(props.getProperty('SHEET_ID'));
+    info.spreadsheetBisaDibuka = true;
+    info.spreadsheetDiTrash = DriveApp.getFileById(ss.getId()).isTrashed();
+  } catch (err) {
+    info.spreadsheetBisaDibuka = 'TIDAK: ' + err.message;
+  }
+  Logger.log(JSON.stringify(info, null, 2));
 }
 
 /** Pesan form ditutup hanya pemanis; kalau Google menolak, jangan sampai menggagalkan pembukaan form. */

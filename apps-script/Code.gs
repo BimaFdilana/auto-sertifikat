@@ -261,8 +261,8 @@ function openFormForHours() {
   var form = FormApp.openById(props.getProperty('FORM_ID'));
 
   removeCloseTriggers_();
-  form.setCustomClosedFormMessage(CONFIG.FORM_CLOSED_MESSAGE);
   form.setAcceptingResponses(true);
+  setClosedMessage_(form);
 
   var closeAt = new Date(Date.now() + CONFIG.FORM_OPEN_HOURS * 3600 * 1000);
   ScriptApp.newTrigger('closeForm').timeBased().at(closeAt).create();
@@ -282,8 +282,8 @@ function openFormUntil() {
 
   var form = FormApp.openById(PropertiesService.getScriptProperties().getProperty('FORM_ID'));
   removeCloseTriggers_();
-  form.setCustomClosedFormMessage(CONFIG.FORM_CLOSED_MESSAGE);
   form.setAcceptingResponses(true);
+  setClosedMessage_(form);
   ScriptApp.newTrigger('closeForm').timeBased().at(closeAt).create();
 
   Logger.log('Form DIBUKA. Otomatis ditutup: ' + closeAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
@@ -296,6 +296,15 @@ function closeForm() {
   form.setAcceptingResponses(false);
   removeCloseTriggers_();
   Logger.log('Form DITUTUP.');
+}
+
+/** Pesan form ditutup hanya pemanis; kalau Google menolak, jangan sampai menggagalkan pembukaan form. */
+function setClosedMessage_(form) {
+  try {
+    form.setCustomClosedFormMessage(CONFIG.FORM_CLOSED_MESSAGE);
+  } catch (err) {
+    Logger.log('Pesan form ditutup tidak bisa diatur (diabaikan): ' + err.message);
+  }
 }
 
 function removeCloseTriggers_() {

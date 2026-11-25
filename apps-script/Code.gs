@@ -33,6 +33,8 @@ var CONFIG = {
 
   // Lama form dibuka (jam) sejak openFormForHours() dijalankan, lalu otomatis ditutup
   FORM_OPEN_HOURS: 24,
+  // Waktu tutup untuk openFormUntil() (format ISO, +07:00 = WIB)
+  FORM_CLOSE_AT: '2026-11-26T12:00:00+07:00',
   FORM_CLOSED_MESSAGE: 'Pengisian daftar hadir sudah ditutup. Terima kasih atas partisipasi Anda.',
 
   // Kirim sertifikat ke email peserta secara otomatis?
@@ -263,6 +265,25 @@ function openFormForHours() {
   form.setAcceptingResponses(true);
 
   var closeAt = new Date(Date.now() + CONFIG.FORM_OPEN_HOURS * 3600 * 1000);
+  ScriptApp.newTrigger('closeForm').timeBased().at(closeAt).create();
+
+  Logger.log('Form DIBUKA. Otomatis ditutup: ' + closeAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
+  Logger.log('Link form: ' + form.getPublishedUrl());
+}
+
+/**
+ * Buka form SEKARANG dan tutup otomatis pada waktu CONFIG.FORM_CLOSE_AT
+ * (mis. besok jam 12 siang WIB). Dipakai untuk membuka kembali form yang sudah ditutup.
+ */
+function openFormUntil() {
+  var closeAt = new Date(CONFIG.FORM_CLOSE_AT);
+  if (isNaN(closeAt.getTime())) throw new Error('CONFIG.FORM_CLOSE_AT tidak valid. Contoh: 2026-11-26T12:00:00+07:00');
+  if (closeAt.getTime() <= Date.now() + 60000) throw new Error('FORM_CLOSE_AT sudah lewat. Ubah ke waktu yang akan datang.');
+
+  var form = FormApp.openById(PropertiesService.getScriptProperties().getProperty('FORM_ID'));
+  removeCloseTriggers_();
+  form.setCustomClosedFormMessage(CONFIG.FORM_CLOSED_MESSAGE);
+  form.setAcceptingResponses(true);
   ScriptApp.newTrigger('closeForm').timeBased().at(closeAt).create();
 
   Logger.log('Form DIBUKA. Otomatis ditutup: ' + closeAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB');
